@@ -99,9 +99,9 @@ and fix Cognito's FORCE_CHANGE_PASSWORD state.
 
 ```bash
 aws cognito-idp admin-set-user-password \
-  --user-pool-id "us-east-1_6qnlMD62Z" \
+  --user-pool-id "$(terraform output -raw cognito_user_pool_id)" \
   --username "evanwoo327@gmail.com" \
-  --password "P@ssw0rd123" \
+  --password "Own_Password_With_Cognito_Policy" \
   --permanent \
   --region us-east-1
 ```
@@ -110,7 +110,7 @@ Then verify the user status is CONFIRMED.
 
 ```bash
 aws cognito-idp admin-get-user \
-  --user-pool-id "us-east-1_6qnlMD62Z" \
+  --user-pool-id "$(terraform output -raw cognito_user_pool_id)" \
   --username "evanwoo327@gmail.com" \
   --region us-east-1 \
   | grep UserStatus
