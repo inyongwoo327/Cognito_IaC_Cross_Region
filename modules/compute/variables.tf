@@ -21,7 +21,7 @@ variable "cognito_client_id" {
 }
 
 variable "sns_topic_arn" {
-  description = "Unleash live candidate verification SNS topic ARN"
+  description = "Candidate verification SNS topic ARN"
   type        = string
 }
 
