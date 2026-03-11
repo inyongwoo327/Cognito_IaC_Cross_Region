@@ -47,8 +47,8 @@ resource "aws_cognito_user" "test_user" {
   }
 
   # Set a permanent password directly
-  temporary_password   = var.test_user_password
-  message_action       = "SUPPRESS"
+  temporary_password = var.test_user_password
+  message_action     = "SUPPRESS"
 
   lifecycle {
     ignore_changes = [temporary_password]

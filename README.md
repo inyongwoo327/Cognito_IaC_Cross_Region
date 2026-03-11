@@ -16,7 +16,7 @@ IaC to provision computer stack in two different regions, secure it using a cent
 | AWS CLI | 2.x
 | Python | 3.10+
 
-The AWS credentials need to have permissions for: Cognito, Lambda, API Gateway, DynamoDB, ECS, IAM, CloudWatch Logs, VPC, and SNS (cross-account publish).
+The AWS credentials need to have permissions for: Cognito, Lambda, API Gateway, DynamoDB, ECS, IAM, CloudWatch Logs, VPC, and SNS.
 
 ---
 

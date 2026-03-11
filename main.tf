@@ -33,7 +33,7 @@ module "auth" {
     aws = aws.us_east_1
   }
 
-  test_user_email = var.test_user_email
+  test_user_email    = var.test_user_email
   test_user_password = var.test_user_password
 }
 

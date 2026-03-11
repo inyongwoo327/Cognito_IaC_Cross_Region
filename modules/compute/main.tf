@@ -5,8 +5,8 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  region     = data.aws_region.current.id
-  account_id = data.aws_caller_identity.current.account_id
+  region      = data.aws_region.current.id
+  account_id  = data.aws_caller_identity.current.account_id
   name_prefix = "project-${local.region}"
 }
 
@@ -155,10 +155,10 @@ resource "aws_lambda_function" "greeter" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE  = aws_dynamodb_table.greeting_logs.name
-      SNS_TOPIC_ARN   = var.sns_topic_arn
-      YOUR_EMAIL      = var.your_email
-      GITHUB_REPO     = var.github_repo
+      DYNAMODB_TABLE   = aws_dynamodb_table.greeting_logs.name
+      SNS_TOPIC_ARN    = var.sns_topic_arn
+      YOUR_EMAIL       = var.your_email
+      GITHUB_REPO      = var.github_repo
       EXECUTING_REGION = local.region
     }
   }
