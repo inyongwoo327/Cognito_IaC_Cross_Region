@@ -15,7 +15,6 @@ IaC to provision computer stack in two different regions, secure it using a cent
 | Terraform | 1.6+
 | AWS CLI | 2.x
 | Python | 3.10+
-| pip packages
 
 The AWS credentials need to have permissions for: Cognito, Lambda, API Gateway, DynamoDB, ECS, IAM, CloudWatch Logs, VPC, and SNS (cross-account publish).
 
@@ -33,11 +32,11 @@ cd Cognito_IaC_Cross_Region
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Edit `terraform.tfvars`:
+Edit `terraform.tfvars` for example:
 
 ```hcl
-test_user_email    = "evanwoo327@gmail.com"      # YOUR actual email
-test_user_password = "Please_Meet_Cognito_Policy"         # Must meet Cognito policy
+test_user_email    = "evanwoo327@gmail.com"      # Own actual email
+test_user_password = "Own_Password_With_Cognito_Policy"         # Must meet Cognito policy
 github_repo        = "https://github.com/inyongwoo327/Cognito_IaC_Cross_Region.git"
 ```
 
@@ -83,20 +82,48 @@ At the end you will see the outputs.
 
 ## Running the Test Script
 
-### Install dependencies
+### Create virtual env and install dependencies
 
 ```bash
-pip install boto3 requests
+source /Users/User_Name/Cognito_IaC_Cross_Region/.venv/bin/activate
+```
+
+```bash
+pip3 install boto3 requests
 ```
 
 ### Run
+
+Run the following aws cli command to set the username and password 
+and fix Cognito's FORCE_CHANGE_PASSWORD state.
+
+```bash
+aws cognito-idp admin-set-user-password \
+  --user-pool-id "us-east-1_6qnlMD62Z" \
+  --username "evanwoo327@gmail.com" \
+  --password "P@ssw0rd123" \
+  --permanent \
+  --region us-east-1
+```
+
+Then verify the user status is CONFIRMED.
+
+```bash
+aws cognito-idp admin-get-user \
+  --user-pool-id "us-east-1_6qnlMD62Z" \
+  --username "evanwoo327@gmail.com" \
+  --region us-east-1 \
+  | grep UserStatus
+```
+
+Then run the test script based on the terraform output.
 
 ```bash
 python test.py \
   --pool-id    "$(terraform output -raw cognito_user_pool_id)" \
   --client-id  "$(terraform output -raw cognito_client_id)" \
   --email      "evanwoo327@gmail.com" \
-  --password   "Please_Meet_Cognito_Policy" \
+  --password   "Own_Password_With_Cognito_Policy" \
   --api-us     "$(terraform output -raw api_url_us_east_1)" \
   --api-eu     "$(terraform output -raw api_url_eu_west_1)"
 ```
