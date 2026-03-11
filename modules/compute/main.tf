@@ -207,3 +207,153 @@ resource "aws_lambda_permission" "dispatcher_apigw" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
 }
+
+# API Gateway v2 (HTTP API)
+
+resource "aws_apigatewayv2_api" "main" {
+  name          = "${local.name_prefix}-api"
+  protocol_type = "HTTP"
+}
+
+# Cognito JWT Authorizer — points to us-east-1 pool
+resource "aws_apigatewayv2_authorizer" "cognito" {
+  api_id           = aws_apigatewayv2_api.main.id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "cognito-jwt"
+
+  jwt_configuration {
+    # Extract pool ID from ARN: arn:aws:cognito-idp:us-east-1:123:userpool/us-east-1_ABC
+    audience = [var.cognito_client_id]
+    issuer   = "https://cognito-idp.us-east-1.amazonaws.com/${regex("userpool/(.+)$", var.cognito_user_pool_arn)[0]}"
+  }
+}
+
+# Integrations
+resource "aws_apigatewayv2_integration" "greeter" {
+  api_id                 = aws_apigatewayv2_api.main.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.greeter.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_integration" "dispatcher" {
+  api_id                 = aws_apigatewayv2_api.main.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.dispatcher.invoke_arn
+  payload_format_version = "2.0"
+}
+
+# Routes
+resource "aws_apigatewayv2_route" "greet" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /greet"
+  target             = "integrations/${aws_apigatewayv2_integration.greeter.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "dispatch" {
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /dispatch"
+  target             = "integrations/${aws_apigatewayv2_integration.dispatcher.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# Stage
+resource "aws_apigatewayv2_stage" "default" {
+  api_id      = aws_apigatewayv2_api.main.id
+  name        = "$default"
+  auto_deploy = true
+}
+
+# ECS Fargate
+resource "aws_ecs_cluster" "main" {
+  name = "${local.name_prefix}-cluster"
+}
+
+# IAM role for ECS task execution
+data "aws_iam_policy_document" "ecs_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ecs_execution" {
+  name               = "${local.name_prefix}-ecs-exec-role"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_policy" {
+  role       = aws_iam_role.ecs_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# IAM role for the ECS task itself (needs SNS publish)
+resource "aws_iam_role" "ecs_task" {
+  name               = "${local.name_prefix}-ecs-task-role"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+
+data "aws_iam_policy_document" "ecs_task_perms" {
+  statement {
+    actions   = ["sns:Publish"]
+    resources = [var.sns_topic_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "ecs_task_perms" {
+  name   = "${local.name_prefix}-ecs-task-perms"
+  role   = aws_iam_role.ecs_task.id
+  policy = data.aws_iam_policy_document.ecs_task_perms.json
+}
+
+
+# CloudWatch log group for ECS
+resource "aws_cloudwatch_log_group" "ecs" {
+  name              = "/ecs/${local.name_prefix}-sns-publisher"
+  retention_in_days = 7
+}
+
+# Task Definition — uses amazon/aws-cli image to publish SNS message then exit
+resource "aws_ecs_task_definition" "sns_publisher" {
+  family                   = "${local.name_prefix}-sns-publisher"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "sns-publisher"
+      image = "amazon/aws-cli"
+      command = [
+        "sns", "publish",
+        "--region", "us-east-1",
+        "--topic-arn", var.sns_topic_arn,
+        "--message", jsonencode({
+          email  = var.your_email
+          source = "ECS"
+          region = local.region
+          repo   = var.github_repo
+        })
+      ]
+      essential = true
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
+          "awslogs-region"        = local.region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+    }
+  ])
+}
