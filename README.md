@@ -69,8 +69,6 @@ This downloads the AWS provider for both regions.
 terraform plan
 ```
 
-You should see ~40 resources planned across both regions.
-
 ### 5. Apply
 
 ```bash
