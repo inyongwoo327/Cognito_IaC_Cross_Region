@@ -10,11 +10,11 @@ IaC to provision computer stack in two different regions, secure it using a cent
 
 ## Prerequisites
 
-| Tool | Minimum version | Install |
-|------|----------------|---------|
-| Terraform | 1.6+
-| AWS CLI | 2.x
-| Python | 3.10+
+| Tool | Minimum version |
+|------|---------------- |
+| Terraform | 1.6+ |
+| AWS CLI | 2.x |
+| Python | 3.10+ |
 
 The AWS credentials need to have permissions for: Cognito, Lambda, API Gateway, DynamoDB, ECS, IAM, CloudWatch Logs, VPC, and SNS.
 
@@ -127,6 +127,15 @@ python test.py \
   --api-us     "$(terraform output -raw api_url_us_east_1)" \
   --api-eu     "$(terraform output -raw api_url_eu_west_1)"
 ```
+
+### Ideal test result
+
+=== Summary ===
+  /greet assertions:    all passed
+  /dispatch assertions: all passed
+
+ALL TESTS PASSED
+
 
 ## Tear Down Infrastructure
 
