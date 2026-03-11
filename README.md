@@ -137,3 +137,52 @@ terraform destroy
 ```
 
 Type `yes` to confirm. All resources in both regions will be deleted.
+
+---
+
+## Multi-Region Provider Design Explanations
+
+The root `main.tf` declares two provider aliases pointing to different regions:
+
+```hcl
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
+provider "aws" {
+  alias  = "eu_west_1"
+  region = "eu-west-1"
+}
+```
+
+The `modules/compute` module is instantiated twice — once per alias — via the `providers` meta-argument:
+
+```hcl
+module "compute_us" {
+  source    = "./modules/compute"
+  providers = { aws = aws.us_east_1 }
+  ...
+}
+
+module "compute_eu" {
+  source    = "./modules/compute"
+  providers = { aws = aws.eu_west_1 }
+  ...
+}
+```
+
+Inside the module, `data "aws_region" "current" {}` resolves to whichever region the passed-in provider is scoped to. This means the same module code provisions identical infrastructure in both regions with zero duplication.
+
+The Cognito pool is always in `us-east-1`. Both API Gateway JWT authorizers — regardless of their region — reference the pool's ARN and the `https://cognito-idp.us-east-1.amazonaws.com/<pool-id>` issuer URL.
+
+---
+
+## Security Considerations
+
+- **No hardcoded credentials** — all secrets passed via `terraform.tfvars` (gitignored) or GitHub Actions secrets
+- **IAM least-privilege** — Lambda roles have explicit, minimal DynamoDB/SNS/ECS permissions only
+- **ECS task role** scoped to SNS publish on the single verification topic
+- **No NAT Gateway** — Fargate tasks use public subnets with `assignPublicIp: ENABLED`, which can save NAT costs
+- **API Gateway JWT auth** — all routes require a valid Cognito token; no unauthenticated access
+- **Checkov** scans IaC for misconfigurations in CI before any `apply`
